@@ -37,6 +37,7 @@ pub fn fetch_forecast(config: &Config) -> Result<Forecast> {
 }
 
 fn geocode(config: &Config) -> Result<GeoResult> {
+    eprintln!("[weather] geocoding city {:?} ...", config.location.city);
     let mut response = ureq::get(GEOCODE_URL)
         .query("name", &config.location.city)
         .query("count", "10")
@@ -49,6 +50,7 @@ fn geocode(config: &Config) -> Result<GeoResult> {
         .body_mut()
         .read_json()
         .context("decoding geocoding response")?;
+    eprintln!("[weather] geocoding response received");
 
     let results = body
         .results
@@ -68,12 +70,18 @@ fn geocode(config: &Config) -> Result<GeoResult> {
         None => results.first(),
     };
 
-    chosen
+    let chosen = chosen
         .cloned()
-        .ok_or_else(|| anyhow!("no usable geocoding result"))
+        .ok_or_else(|| anyhow!("no usable geocoding result"))?;
+    eprintln!(
+        "[weather] resolved to {} @ {:.4},{:.4}",
+        chosen.name, chosen.latitude, chosen.longitude
+    );
+    Ok(chosen)
 }
 
 fn fetch_raw(config: &Config, latitude: f64, longitude: f64) -> Result<ForecastResponse> {
+    eprintln!("[weather] fetching forecast @ {latitude:.4},{longitude:.4} ...");
     let mut response = ureq::get(FORECAST_URL)
         .query("latitude", latitude.to_string())
         .query("longitude", longitude.to_string())
@@ -90,10 +98,12 @@ fn fetch_raw(config: &Config, latitude: f64, longitude: f64) -> Result<ForecastR
         .call()
         .context("forecast request failed")?;
 
-    response
+    let parsed = response
         .body_mut()
         .read_json()
-        .context("decoding forecast response")
+        .context("decoding forecast response")?;
+    eprintln!("[weather] forecast response received");
+    Ok(parsed)
 }
 
 fn build_days(daily: &DailyBlock) -> Result<Vec<Day>> {
@@ -115,8 +125,16 @@ fn build_days(daily: &DailyBlock) -> Result<Vec<Day>> {
             .unwrap_or(Condition::Unknown);
         days.push(Day {
             date,
-            temp_max: daily.temperature_2m_max.get(i).and_then(|t| *t).unwrap_or(0.0),
-            temp_min: daily.temperature_2m_min.get(i).and_then(|t| *t).unwrap_or(0.0),
+            temp_max: daily
+                .temperature_2m_max
+                .get(i)
+                .and_then(|t| *t)
+                .unwrap_or(0.0),
+            temp_min: daily
+                .temperature_2m_min
+                .get(i)
+                .and_then(|t| *t)
+                .unwrap_or(0.0),
             precip_prob: daily
                 .precipitation_probability_max
                 .get(i)

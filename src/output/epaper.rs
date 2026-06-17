@@ -31,13 +31,19 @@ pub fn canvas_size(config: &Config) -> (u32, u32) {
 
 /// Push an already-rendered canvas to the panel, then put it to deep sleep.
 pub fn show(config: &Config, canvas: &Canvas) -> Result<()> {
+    log("opening SPI0 ...");
     let bus = Spi::new(Bus::Spi0, SlaveSelect::Ss0, SPI_CLOCK_HZ, Mode::Mode0)
         .context("opening SPI0 (is SPI enabled via raspi-config?)")?;
     let mut spi = SimpleHalSpiDevice::new(bus);
     let mut delay = Delay::new();
+    log("SPI0 open");
 
+    log("opening GPIO pins ...");
     let gpio = Gpio::new().context("opening GPIO")?;
-    let dc = gpio.get(config.display.pins.dc).context("DC pin")?.into_output();
+    let dc = gpio
+        .get(config.display.pins.dc)
+        .context("DC pin")?
+        .into_output();
     let rst = gpio
         .get(config.display.pins.reset)
         .context("RESET pin")?
@@ -46,19 +52,32 @@ pub fn show(config: &Config, canvas: &Canvas) -> Result<()> {
         .get(config.display.pins.busy)
         .context("BUSY pin")?
         .into_input();
+    log("GPIO pins open");
 
+    log("initialising controller (reset + power-on, waits on BUSY) ...");
     let mut epd = Epd7in5::new(&mut spi, busy, dc, rst, &mut delay, None)
         .map_err(|e| anyhow!("initialising e-paper: {e:?}"))?;
+    log("controller ready");
 
     let mut display = Display7in5::default();
     display.set_rotation(rotation(config.display.rotation));
+    log("blitting framebuffer to panel buffer ...");
     blit(canvas, &mut display, config.display.invert);
+    log("blit complete");
 
+    log("pushing frame + refreshing (waits on BUSY)");
     epd.update_and_display_frame(&mut spi, display.buffer(), &mut delay)
         .map_err(|e| anyhow!("sending frame to panel: {e:?}"))?;
+    log("frame displayed; putting panel to deep sleep");
     epd.sleep(&mut spi, &mut delay)
         .map_err(|e| anyhow!("putting panel to sleep: {e:?}"))?;
+    log("panel asleep, done");
     Ok(())
+}
+
+/// Progress log to stderr (captured by systemd's journal).
+fn log(msg: &str) {
+    eprintln!("[panel] {msg}");
 }
 
 fn rotation(degrees: u16) -> DisplayRotation {

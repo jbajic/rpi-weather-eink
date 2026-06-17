@@ -40,7 +40,10 @@ fn parse_args() -> Args {
 fn run() -> Result<()> {
     let args = parse_args();
 
+    eprintln!("[eink] loading config {} ...", args.config);
     let config = Config::load(&args.config)?;
+    eprintln!("[eink] config loaded");
+
     let forecast = weather::fetch_forecast(&config).context("fetching forecast")?;
 
     #[cfg(feature = "device")]
@@ -48,11 +51,14 @@ fn run() -> Result<()> {
     #[cfg(not(feature = "device"))]
     let (width, height) = (WIDTH, HEIGHT);
 
+    eprintln!("[eink] rendering {width}x{height} framebuffer ...");
     let mut canvas = Canvas::new(width, height);
     render::draw(&mut canvas, &forecast, &config)?;
+    eprintln!("[eink] framebuffer rendered");
 
     #[cfg(feature = "device")]
     {
+        eprintln!("[eink] sending to e-paper panel");
         eink::output::epaper::show(&config, &canvas).context("driving e-paper panel")?;
         println!(
             "rendered {} ({} days) -> e-paper panel",

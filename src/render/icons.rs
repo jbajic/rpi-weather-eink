@@ -23,8 +23,16 @@ where
     match condition {
         Condition::Clear | Condition::MainlyClear => sun(target, center, s * 0.32)?,
         Condition::PartlyCloudy => {
-            sun(target, center + Point::new(-(s * 0.18) as i32, -(s * 0.18) as i32), s * 0.20)?;
-            cloud(target, center + Point::new((s * 0.10) as i32, (s * 0.10) as i32), s * 0.80)?;
+            sun(
+                target,
+                center + Point::new(-(s * 0.18) as i32, -(s * 0.18) as i32),
+                s * 0.20,
+            )?;
+            cloud(
+                target,
+                center + Point::new((s * 0.10) as i32, (s * 0.10) as i32),
+                s * 0.80,
+            )?;
         }
         Condition::Overcast | Condition::Fog => cloud(target, center, s * 0.92)?,
         Condition::Drizzle => {
@@ -38,7 +46,13 @@ where
         Condition::FreezingRain => {
             cloud(target, center + Point::new(0, -(s * 0.12) as i32), s * 0.82)?;
             rain(target, center, s, 3)?;
-            drops(target, center + Point::new((s * 0.22) as i32, 0), s, 1, s * 0.07)?;
+            drops(
+                target,
+                center + Point::new((s * 0.22) as i32, 0),
+                s,
+                1,
+                s * 0.07,
+            )?;
         }
         Condition::Snow | Condition::SnowShowers => {
             cloud(target, center + Point::new(0, -(s * 0.12) as i32), s * 0.82)?;
@@ -117,13 +131,21 @@ where
 {
     let cx = center.x as f32;
     let cy = center.y as f32;
-    filled_circle(target, Point::new((cx - width * 0.24) as i32, cy as i32), width * 0.20)?;
+    filled_circle(
+        target,
+        Point::new((cx - width * 0.24) as i32, cy as i32),
+        width * 0.20,
+    )?;
     filled_circle(
         target,
         Point::new(cx as i32, (cy - width * 0.12) as i32),
         width * 0.27,
     )?;
-    filled_circle(target, Point::new((cx + width * 0.26) as i32, cy as i32), width * 0.22)?;
+    filled_circle(
+        target,
+        Point::new((cx + width * 0.26) as i32, cy as i32),
+        width * 0.22,
+    )?;
     let base = Rectangle::new(
         Point::new((cx - width * 0.44) as i32, cy as i32),
         Size::new((width * 0.88) as u32, (width * 0.22) as u32),
@@ -135,8 +157,7 @@ where
 }
 
 /// Short diagonal rain streaks below the cloud.
-fn rain<D>(target: &mut D, center: Point, s: f32, count: u32)
-    -> Result<()>
+fn rain<D>(target: &mut D, center: Point, s: f32, count: u32) -> Result<()>
 where
     D: DrawTarget<Color = BinaryColor>,
     D::Error: core::fmt::Debug,
@@ -146,7 +167,11 @@ where
     let width = (s * 0.05).max(2.0) as u32;
     let spread = s * 0.5;
     for k in 0..count {
-        let frac = if count > 1 { k as f32 / (count - 1) as f32 } else { 0.5 };
+        let frac = if count > 1 {
+            k as f32 / (count - 1) as f32
+        } else {
+            0.5
+        };
         let x = center.x as f32 - spread / 2.0 + spread * frac;
         let a = Point::new(x as i32, top as i32);
         let b = Point::new((x - len * 0.4) as i32, (top + len) as i32);
@@ -164,7 +189,11 @@ where
     let y = center.y as f32 + s * 0.22;
     let spread = s * 0.4;
     for k in 0..count {
-        let frac = if count > 1 { k as f32 / (count - 1) as f32 } else { 0.5 };
+        let frac = if count > 1 {
+            k as f32 / (count - 1) as f32
+        } else {
+            0.5
+        };
         let x = center.x as f32 - spread / 2.0 + spread * frac;
         filled_circle(target, Point::new(x as i32, y as i32), radius)?;
     }

@@ -50,20 +50,62 @@ where
     let big = FontRenderer::new::<fonts::u8g2_font_logisoso32_tf>();
 
     // Left column: place, date, current condition.
-    text(target, &title, &forecast.location_name, Point::new(16, 12), VerticalPosition::Top, HorizontalAlignment::Left)?;
+    text(
+        target,
+        &title,
+        &forecast.location_name,
+        Point::new(16, 12),
+        VerticalPosition::Top,
+        HorizontalAlignment::Left,
+    )?;
 
     if let Some(today) = forecast.days.first() {
         let d = today.date;
-        let date = format!("{}, {} {} {}", d.weekday_short(), d.day, d.month_short(), d.year);
-        text(target, &body, &date, Point::new(16, 48), VerticalPosition::Top, HorizontalAlignment::Left)?;
+        let date = format!(
+            "{}, {} {} {}",
+            d.weekday_short(),
+            d.day,
+            d.month_short(),
+            d.year
+        );
+        text(
+            target,
+            &body,
+            &date,
+            Point::new(16, 48),
+            VerticalPosition::Top,
+            HorizontalAlignment::Left,
+        )?;
     }
     let now = format!("Now: {}", forecast.current.condition.label());
-    text(target, &body, &now, Point::new(16, 76), VerticalPosition::Top, HorizontalAlignment::Left)?;
+    text(
+        target,
+        &body,
+        &now,
+        Point::new(16, 76),
+        VerticalPosition::Top,
+        HorizontalAlignment::Left,
+    )?;
 
     // Right side: current temperature (right-aligned) and a large icon to its left.
-    let temp = format!("{:.0}{}", forecast.current.temperature, forecast.temperature_symbol);
-    text(target, &big, &temp, Point::new(width - 16, 14), VerticalPosition::Top, HorizontalAlignment::Right)?;
-    icons::draw_icon(target, forecast.current.condition, Point::new(width - 220, 56), 84)?;
+    let temp = format!(
+        "{:.0}{}",
+        forecast.current.temperature, forecast.temperature_symbol
+    );
+    text(
+        target,
+        &big,
+        &temp,
+        Point::new(width - 16, 14),
+        VerticalPosition::Top,
+        HorizontalAlignment::Right,
+    )?;
+    icons::draw_icon(
+        target,
+        forecast.current.condition,
+        Point::new(width - 220, 56),
+        84,
+    )?;
 
     Ok(())
 }
@@ -99,17 +141,38 @@ where
         }
 
         let label = format!("{} {}", day.date.weekday_short(), day.date.day);
-        text(target, &weekday, &label, Point::new(cx, top + 14), VerticalPosition::Top, HorizontalAlignment::Center)?;
+        text(
+            target,
+            &weekday,
+            &label,
+            Point::new(cx, top + 14),
+            VerticalPosition::Top,
+            HorizontalAlignment::Center,
+        )?;
 
         let icon_cy = top + (card_h as f32 * 0.42) as i32;
         icons::draw_icon(target, day.condition, Point::new(cx, icon_cy), icon_size)?;
 
         let hi_lo = format!("{:.0}° / {:.0}°", day.temp_max, day.temp_min);
-        text(target, &temps, &hi_lo, Point::new(cx, top + (card_h as f32 * 0.72) as i32), VerticalPosition::Top, HorizontalAlignment::Center)?;
+        text(
+            target,
+            &temps,
+            &hi_lo,
+            Point::new(cx, top + (card_h as f32 * 0.72) as i32),
+            VerticalPosition::Top,
+            HorizontalAlignment::Center,
+        )?;
 
         if let Some(p) = day.precip_prob {
             let rain = format!("{p}%");
-            text(target, &small, &rain, Point::new(cx, top + (card_h as f32 * 0.85) as i32), VerticalPosition::Top, HorizontalAlignment::Center)?;
+            text(
+                target,
+                &small,
+                &rain,
+                Point::new(cx, top + (card_h as f32 * 0.85) as i32),
+                VerticalPosition::Top,
+                HorizontalAlignment::Center,
+            )?;
         }
     }
     Ok(())
@@ -127,8 +190,15 @@ where
     D: DrawTarget<Color = BinaryColor>,
     D::Error: core::fmt::Debug,
 {
-    font.render_aligned(s, pos, vertical, horizontal, FontColor::Transparent(BLACK), target)
-        .map_err(|e| anyhow!("font render error: {e:?}"))?;
+    font.render_aligned(
+        s,
+        pos,
+        vertical,
+        horizontal,
+        FontColor::Transparent(BLACK),
+        target,
+    )
+    .map_err(|e| anyhow!("font render error: {e:?}"))?;
     Ok(())
 }
 
