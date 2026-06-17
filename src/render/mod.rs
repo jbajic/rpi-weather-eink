@@ -48,6 +48,7 @@ where
     let title = FontRenderer::new::<fonts::u8g2_font_helvB18_tf>();
     let body = FontRenderer::new::<fonts::u8g2_font_helvR14_tf>();
     let big = FontRenderer::new::<fonts::u8g2_font_logisoso32_tf>();
+    let small = FontRenderer::new::<fonts::u8g2_font_helvR10_tf>();
 
     // Left column: place, date, current condition.
     text(
@@ -105,6 +106,16 @@ where
         forecast.current.condition,
         Point::new(width - 220, 56),
         84,
+    )?;
+
+    let refreshed = format!("Refreshed {}", forecast.refreshed_at);
+    text(
+        target,
+        &small,
+        &refreshed,
+        Point::new(width - 16, 96),
+        VerticalPosition::Top,
+        HorizontalAlignment::Right,
     )?;
 
     Ok(())

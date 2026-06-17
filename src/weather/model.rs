@@ -103,6 +103,31 @@ impl Date {
         ];
         MONTHS[(self.month - 1) as usize]
     }
+
+    /// Civil date from a count of days since the Unix epoch (Hinnant's algorithm).
+    fn from_days_since_epoch(days: i64) -> Date {
+        let z = days + 719_468;
+        let era = z.div_euclid(146_097);
+        let doe = z - era * 146_097;
+        let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+        let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+        let mp = (5 * doy + 2) / 153;
+        let day = (doy - (153 * mp + 2) / 5 + 1) as u32;
+        let month = if mp < 10 { mp + 3 } else { mp - 9 } as u32;
+        let year = (yoe + era * 400) as i32 + i32::from(month <= 2);
+        Date { year, month, day }
+    }
+}
+
+/// Format a local Unix timestamp (seconds, already offset to local time) as
+/// `DD.MM HH:MM`, e.g. "17.06 22:05".
+pub fn format_local_timestamp(local_unix_secs: i64) -> String {
+    let days = local_unix_secs.div_euclid(86_400);
+    let secs = local_unix_secs.rem_euclid(86_400);
+    let hour = secs / 3600;
+    let minute = (secs % 3600) / 60;
+    let date = Date::from_days_since_epoch(days);
+    format!("{:02}.{:02} {hour:02}:{minute:02}", date.day, date.month)
 }
 
 #[derive(Debug, Clone)]
@@ -129,6 +154,8 @@ pub struct Forecast {
     pub days: Vec<Day>,
     /// Unit symbol shown next to temperatures, e.g. "°C".
     pub temperature_symbol: &'static str,
+    /// Local wall-clock time the forecast was fetched/rendered, e.g. "Wed 17 Jun 22:05".
+    pub refreshed_at: String,
 }
 
 #[cfg(test)]

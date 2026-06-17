@@ -1,12 +1,14 @@
 //! Open-Meteo client: geocode a city name, then fetch a 7-day forecast.
 //! No API key required.
 
+use std::time::{SystemTime, UNIX_EPOCH};
+
 use anyhow::{Context, Result, anyhow};
 use serde::Deserialize;
 
 use crate::config::Config;
 
-use super::model::{Condition, Current, Date, Day, Forecast};
+use super::model::{Condition, Current, Date, Day, Forecast, format_local_timestamp};
 
 const GEOCODE_URL: &str = "https://geocoding-api.open-meteo.com/v1/search";
 const FORECAST_URL: &str = "https://api.open-meteo.com/v1/forecast";
@@ -33,7 +35,18 @@ pub fn fetch_forecast(config: &Config) -> Result<Forecast> {
         current,
         days,
         temperature_symbol: config.units.temperature.symbol(),
+        refreshed_at: format_local_timestamp(now_local_secs(raw.utc_offset_seconds)),
     })
+}
+
+/// Current wall-clock time, shifted into the location's local timezone using
+/// the offset Open-Meteo reports for the requested coordinates.
+fn now_local_secs(utc_offset_seconds: i64) -> i64 {
+    let now_utc = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0);
+    now_utc + utc_offset_seconds
 }
 
 fn geocode(config: &Config) -> Result<GeoResult> {
@@ -168,6 +181,8 @@ struct GeoResult {
 
 #[derive(Debug, Deserialize)]
 struct ForecastResponse {
+    #[serde(default)]
+    utc_offset_seconds: i64,
     current: CurrentBlock,
     daily: DailyBlock,
 }
