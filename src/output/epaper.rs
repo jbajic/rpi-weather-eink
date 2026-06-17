@@ -1,8 +1,12 @@
 //! Drive the Waveshare 7.5" V2 e-paper panel from a Raspberry Pi over SPI.
 //!
-//! The render pipeline produces a [`Canvas`] (1-bit, `BinaryColor`); this module
-//! blits it into the panel's native buffer and pushes a single full refresh,
-//! then sends the controller to deep sleep to save power between runs.
+//! [`Panel`] opens SPI/GPIO and initialises the controller **once**, then
+//! [`Panel::push`] sends a full-refresh frame. A long-running daemon keeps a
+//! single `Panel` alive and pushes on each tick — so the controller is only
+//! initialised once and never deep-slept/re-woken between refreshes, which is
+//! the cycle that can hang on BUSY.
+//!
+//! [`show`] is the one-shot convenience: open, push once, drop.
 
 use anyhow::{Context, Result, anyhow};
 use embedded_graphics::Pixel;
@@ -11,7 +15,7 @@ use epd_waveshare::color::Color;
 use epd_waveshare::epd7in5_v2::{self, Display7in5, Epd7in5};
 use epd_waveshare::graphics::DisplayRotation;
 use epd_waveshare::prelude::WaveshareDisplay;
-use rppal::gpio::Gpio;
+use rppal::gpio::{Gpio, InputPin, OutputPin};
 use rppal::hal::Delay;
 use rppal::spi::{Bus, Mode, SimpleHalSpiDevice, SlaveSelect, Spi};
 
@@ -19,6 +23,8 @@ use crate::canvas::Canvas;
 use crate::config::Config;
 
 const SPI_CLOCK_HZ: u32 = 4_000_000;
+
+type PanelEpd = Epd7in5<SimpleHalSpiDevice, InputPin, OutputPin, OutputPin, Delay>;
 
 /// Logical canvas dimensions for the configured rotation. The render layout
 /// uses these so the panel's own rotation mapping lines up 1:1.
@@ -29,49 +35,76 @@ pub fn canvas_size(config: &Config) -> (u32, u32) {
     }
 }
 
-/// Push an already-rendered canvas to the panel, then put it to deep sleep.
+/// An initialised panel, ready to receive frames.
+pub struct Panel {
+    spi: SimpleHalSpiDevice,
+    delay: Delay,
+    epd: PanelEpd,
+    rotation: DisplayRotation,
+    invert: bool,
+}
+
+impl Panel {
+    /// Open SPI/GPIO and initialise the controller (resets + powers on).
+    pub fn open(config: &Config) -> Result<Self> {
+        log("opening SPI0 ...");
+        let bus = Spi::new(Bus::Spi0, SlaveSelect::Ss0, SPI_CLOCK_HZ, Mode::Mode0)
+            .context("opening SPI0 (is SPI enabled via raspi-config?)")?;
+        let mut spi = SimpleHalSpiDevice::new(bus);
+        let mut delay = Delay::new();
+        log("SPI0 open");
+
+        log("opening GPIO pins ...");
+        let gpio = Gpio::new().context("opening GPIO")?;
+        let dc = gpio
+            .get(config.display.pins.dc)
+            .context("DC pin")?
+            .into_output();
+        let rst = gpio
+            .get(config.display.pins.reset)
+            .context("RESET pin")?
+            .into_output();
+        let busy = gpio
+            .get(config.display.pins.busy)
+            .context("BUSY pin")?
+            .into_input();
+        log("GPIO pins open");
+
+        log("initialising controller (reset + power-on, waits on BUSY) ...");
+        let epd = Epd7in5::new(&mut spi, busy, dc, rst, &mut delay, None)
+            .map_err(|e| anyhow!("initialising e-paper: {e:?}"))?;
+        log("controller ready");
+
+        Ok(Self {
+            spi,
+            delay,
+            epd,
+            rotation: rotation(config.display.rotation),
+            invert: config.display.invert,
+        })
+    }
+
+    /// Render `canvas` into the panel buffer and do a full refresh.
+    pub fn push(&mut self, canvas: &Canvas) -> Result<()> {
+        let mut display = Display7in5::default();
+        display.set_rotation(self.rotation);
+        log("blitting framebuffer to panel buffer ...");
+        blit(canvas, &mut display, self.invert);
+        log("blit complete");
+
+        log("pushing frame + refreshing (waits on BUSY) ...");
+        self.epd
+            .update_and_display_frame(&mut self.spi, display.buffer(), &mut self.delay)
+            .map_err(|e| anyhow!("sending frame to panel: {e:?}"))?;
+        log("frame displayed");
+        Ok(())
+    }
+}
+
+/// One-shot: open the panel, push a single frame, and drop it.
 pub fn show(config: &Config, canvas: &Canvas) -> Result<()> {
-    log("opening SPI0 ...");
-    let bus = Spi::new(Bus::Spi0, SlaveSelect::Ss0, SPI_CLOCK_HZ, Mode::Mode0)
-        .context("opening SPI0 (is SPI enabled via raspi-config?)")?;
-    let mut spi = SimpleHalSpiDevice::new(bus);
-    let mut delay = Delay::new();
-    log("SPI0 open");
-
-    log("opening GPIO pins ...");
-    let gpio = Gpio::new().context("opening GPIO")?;
-    let dc = gpio
-        .get(config.display.pins.dc)
-        .context("DC pin")?
-        .into_output();
-    let rst = gpio
-        .get(config.display.pins.reset)
-        .context("RESET pin")?
-        .into_output();
-    let busy = gpio
-        .get(config.display.pins.busy)
-        .context("BUSY pin")?
-        .into_input();
-    log("GPIO pins open");
-
-    log("initialising controller (reset + power-on, waits on BUSY) ...");
-    let mut epd = Epd7in5::new(&mut spi, busy, dc, rst, &mut delay, None)
-        .map_err(|e| anyhow!("initialising e-paper: {e:?}"))?;
-    log("controller ready");
-
-    let mut display = Display7in5::default();
-    display.set_rotation(rotation(config.display.rotation));
-    log("blitting framebuffer to panel buffer ...");
-    blit(canvas, &mut display, config.display.invert);
-    log("blit complete");
-
-    log("pushing frame + refreshing (waits on BUSY)");
-    epd.update_and_display_frame(&mut spi, display.buffer(), &mut delay)
-        .map_err(|e| anyhow!("sending frame to panel: {e:?}"))?;
-    log("frame displayed; putting panel to deep sleep");
-    epd.sleep(&mut spi, &mut delay)
-        .map_err(|e| anyhow!("putting panel to sleep: {e:?}"))?;
-    log("panel asleep, done");
+    let mut panel = Panel::open(config)?;
+    panel.push(canvas)?;
     Ok(())
 }
 

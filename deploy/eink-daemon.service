@@ -1,0 +1,16 @@
+[Unit]
+Description=Weather e-ink display daemon
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/eink
+ExecStart=/home/pi/eink/eink-daemon --config /home/pi/eink/config.toml
+# Restart if it exits unexpectedly (e.g. transient panel/SPI error).
+Restart=on-failure
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target

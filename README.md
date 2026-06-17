@@ -106,9 +106,20 @@ ssh pi@raspberrypi.local journalctl -u eink.service -n 30
 Building directly on the Pi Zero W also works but is very slow (single-core
 ARMv6): `cargo build --release --no-default-features --features device`.
 
+## Daemon
+
+The device deployment runs `eink-daemon`: it initialises the panel **once**,
+then loops `fetch → render → push → sleep(interval)`. Keeping one process and a
+single panel init avoids the deep-sleep/wake cycle that can hang the controller.
+`deploy.sh` installs it as a `Type=simple` systemd service. Apply config changes
+with `sudo systemctl restart eink-daemon`.
+
+`render-once` is still available for host PNG previews and manual one-shot renders.
+
 ## Roadmap
 
 - [x] One-shot render → PNG preview (host)
-- [x] One-shot render → e-paper panel (device) via systemd timer
-- [ ] Long-running daemon with an `axum` web UI to edit config and preview the
-      screen live — reuses `config` / `weather` / `render` unchanged.
+- [x] Render → e-paper panel (device)
+- [x] Long-running daemon driven by `interval_minutes`
+- [ ] Web UI (`axum`) to edit config and preview the screen live — reuses
+      `config` / `weather` / `render` / the daemon loop unchanged.

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Cross-compile for the Raspberry Pi Zero W and deploy as a systemd timer.
+# Cross-compile for the Raspberry Pi Zero W and deploy as a long-running daemon.
 #
 # Usage:
 #   PI_HOST=pi@raspberrypi.local ./deploy/deploy.sh
@@ -13,17 +13,18 @@ TARGET="arm-unknown-linux-gnueabihf"
 
 cd "$(dirname "$0")/.."
 
-echo ">> Building render-once for ${TARGET} ..."
+echo ">> Building for ${TARGET} ..."
 cross build --release --target "${TARGET}" --no-default-features --features device
 
-BIN="target/${TARGET}/release/render-once"
-echo ">> Built ${BIN}"
+BIN_DIR="target/${TARGET}/release"
+echo ">> Built ${BIN_DIR}/{eink-daemon,render-once}"
 
 echo ">> Ensuring ${PI_DIR} exists on ${PI_HOST} ..."
 ssh "${PI_HOST}" "mkdir -p '${PI_DIR}'"
 
-echo ">> Copying binary ..."
-scp "${BIN}" "${PI_HOST}:${PI_DIR}/render-once"
+echo ">> Copying binaries ..."
+scp "${BIN_DIR}/eink-daemon" "${PI_HOST}:${PI_DIR}/eink-daemon"
+scp "${BIN_DIR}/render-once" "${PI_HOST}:${PI_DIR}/render-once"
 
 # Never clobber a config already edited on the device.
 if ssh "${PI_HOST}" "test -f '${PI_DIR}/config.toml'"; then
@@ -33,21 +34,17 @@ else
     scp config.toml "${PI_HOST}:${PI_DIR}/config.toml"
 fi
 
-# Apply the refresh interval from config.toml to the timer.
-INTERVAL="$(awk -F= '/^[[:space:]]*interval_minutes/ {gsub(/[^0-9]/, "", $2); print $2; exit}' config.toml)"
-INTERVAL="${INTERVAL:-60}"
-echo ">> Refresh interval: ${INTERVAL} min"
-TMP_TIMER="$(mktemp)"
-sed "s/^OnUnitActiveSec=.*/OnUnitActiveSec=${INTERVAL}min/" deploy/eink.timer > "${TMP_TIMER}"
+echo ">> Removing any old one-shot timer/service ..."
+ssh "${PI_HOST}" "sudo systemctl disable --now eink.timer eink.service 2>/dev/null; \
+    sudo rm -f /etc/systemd/system/eink.timer /etc/systemd/system/eink.service; true"
 
-echo ">> Installing systemd units ..."
-scp deploy/eink.service "${PI_HOST}:/tmp/eink.service"
-scp "${TMP_TIMER}" "${PI_HOST}:/tmp/eink.timer"
-rm -f "${TMP_TIMER}"
-ssh "${PI_HOST}" "sudo mv /tmp/eink.service /tmp/eink.timer /etc/systemd/system/ \
+echo ">> Installing daemon service ..."
+scp deploy/eink-daemon.service "${PI_HOST}:/tmp/eink-daemon.service"
+ssh "${PI_HOST}" "sudo mv /tmp/eink-daemon.service /etc/systemd/system/ \
     && sudo systemctl daemon-reload \
-    && sudo systemctl enable --now eink.timer"
+    && sudo systemctl enable --now eink-daemon.service"
 
-echo ">> Done. Run a render right now with:"
-echo "   ssh ${PI_HOST} sudo systemctl start eink.service"
-echo "   ssh ${PI_HOST} journalctl -u eink.service -n 30"
+echo ">> Done. The daemon is running. Watch it with:"
+echo "   ssh ${PI_HOST} journalctl -u eink-daemon -f"
+echo ">> After editing config.toml on the device, apply changes with:"
+echo "   ssh ${PI_HOST} sudo systemctl restart eink-daemon"

@@ -29,3 +29,8 @@ path = "src/lib.rs"
 [[bin]]
 name = "render-once"
 path = "src/bin/render-once.rs"
+
+[[bin]]
+name = "eink-daemon"
+path = "src/bin/eink-daemon.rs"
+required-features = ["device"]
