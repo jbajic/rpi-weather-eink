@@ -11,12 +11,51 @@ use serde::Deserialize;
 #[derive(Debug, Clone, Deserialize)]
 pub struct Config {
     pub location: Location,
+    /// UI language for labels, weekdays and months.
+    #[serde(default)]
+    pub language: Language,
     #[serde(default)]
     pub units: Units,
     #[serde(default)]
     pub display: Display,
     #[serde(default)]
     pub refresh: Refresh,
+}
+
+/// Display language. Croatian uses ASCII counterparts for diacritics
+/// (c/z/s/d for č/ž/š/đ), which the bitmap fonts render cleanly.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Language {
+    #[default]
+    En,
+    Hr,
+}
+
+impl Language {
+    /// ISO code for API query parameters (Open-Meteo geocoding `language`).
+    pub fn code(self) -> &'static str {
+        match self {
+            Language::En => "en",
+            Language::Hr => "hr",
+        }
+    }
+
+    /// Prefix for the current-conditions line, e.g. "Now:".
+    pub fn now_prefix(self) -> &'static str {
+        match self {
+            Language::En => "Now:",
+            Language::Hr => "Sada:",
+        }
+    }
+
+    /// Prefix for the refresh-time line, e.g. "Refreshed".
+    pub fn refreshed_prefix(self) -> &'static str {
+        match self {
+            Language::En => "Refreshed",
+            Language::Hr => "Osvjezeno",
+        }
+    }
 }
 
 impl Config {

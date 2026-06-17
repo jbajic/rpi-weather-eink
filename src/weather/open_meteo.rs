@@ -54,7 +54,7 @@ fn geocode(config: &Config) -> Result<GeoResult> {
     let mut response = ureq::get(GEOCODE_URL)
         .query("name", &config.location.city)
         .query("count", "10")
-        .query("language", "en")
+        .query("language", config.language.code())
         .query("format", "json")
         .call()
         .context("geocoding request failed")?;
@@ -229,6 +229,9 @@ mod tests {
         assert_eq!(days[1].condition, Condition::Rain);
         assert_eq!(days[1].precip_prob, Some(80));
         assert_eq!(days[2].precip_prob, None);
-        assert_eq!(days[0].date.weekday_short(), "Wed");
+        assert_eq!(
+            days[0].date.weekday_short(crate::config::Language::En),
+            "Wed"
+        );
     }
 }

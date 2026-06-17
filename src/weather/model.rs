@@ -1,5 +1,7 @@
 //! The display-facing weather model, decoupled from the Open-Meteo JSON shape.
 
+use crate::config::Language;
+
 /// A weather condition, derived from a WMO weather interpretation code.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Condition {
@@ -39,21 +41,38 @@ impl Condition {
     }
 
     /// Short human-readable label for the header.
-    pub fn label(self) -> &'static str {
-        match self {
-            Condition::Clear => "Clear",
-            Condition::MainlyClear => "Mainly clear",
-            Condition::PartlyCloudy => "Partly cloudy",
-            Condition::Overcast => "Overcast",
-            Condition::Fog => "Fog",
-            Condition::Drizzle => "Drizzle",
-            Condition::Rain => "Rain",
-            Condition::FreezingRain => "Freezing rain",
-            Condition::Snow => "Snow",
-            Condition::Showers => "Showers",
-            Condition::SnowShowers => "Snow showers",
-            Condition::Thunderstorm => "Thunderstorm",
-            Condition::Unknown => "—",
+    pub fn label(self, lang: Language) -> &'static str {
+        match lang {
+            Language::En => match self {
+                Condition::Clear => "Clear",
+                Condition::MainlyClear => "Mainly clear",
+                Condition::PartlyCloudy => "Partly cloudy",
+                Condition::Overcast => "Overcast",
+                Condition::Fog => "Fog",
+                Condition::Drizzle => "Drizzle",
+                Condition::Rain => "Rain",
+                Condition::FreezingRain => "Freezing rain",
+                Condition::Snow => "Snow",
+                Condition::Showers => "Showers",
+                Condition::SnowShowers => "Snow showers",
+                Condition::Thunderstorm => "Thunderstorm",
+                Condition::Unknown => "—",
+            },
+            Language::Hr => match self {
+                Condition::Clear => "Vedro",
+                Condition::MainlyClear => "Pretezno vedro",
+                Condition::PartlyCloudy => "Djelomicno oblacno",
+                Condition::Overcast => "Oblacno",
+                Condition::Fog => "Magla",
+                Condition::Drizzle => "Rosulja",
+                Condition::Rain => "Kisa",
+                Condition::FreezingRain => "Ledena kisa",
+                Condition::Snow => "Snijeg",
+                Condition::Showers => "Pljuskovi",
+                Condition::SnowShowers => "Snjezni pljuskovi",
+                Condition::Thunderstorm => "Grmljavina",
+                Condition::Unknown => "—",
+            },
         }
     }
 }
@@ -92,16 +111,28 @@ impl Date {
         (((y + y / 4 - y / 100 + y / 400 + T[m] + self.day as i32) % 7 + 7) % 7) as usize
     }
 
-    pub fn weekday_short(self) -> &'static str {
-        const DAYS: [&str; 7] = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-        DAYS[self.weekday_index()]
+    pub fn weekday_short(self, lang: Language) -> &'static str {
+        const EN: [&str; 7] = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+        const HR: [&str; 7] = ["Ned", "Pon", "Uto", "Sri", "Cet", "Pet", "Sub"];
+        let days = match lang {
+            Language::En => &EN,
+            Language::Hr => &HR,
+        };
+        days[self.weekday_index()]
     }
 
-    pub fn month_short(self) -> &'static str {
-        const MONTHS: [&str; 12] = [
+    pub fn month_short(self, lang: Language) -> &'static str {
+        const EN: [&str; 12] = [
             "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
         ];
-        MONTHS[(self.month - 1) as usize]
+        const HR: [&str; 12] = [
+            "Sij", "Velj", "Ozu", "Tra", "Svi", "Lip", "Srp", "Kol", "Ruj", "Lis", "Stu", "Pro",
+        ];
+        let months = match lang {
+            Language::En => &EN,
+            Language::Hr => &HR,
+        };
+        months[(self.month - 1) as usize]
     }
 
     /// Civil date from a count of days since the Unix epoch (Hinnant's algorithm).
@@ -167,14 +198,16 @@ mod tests {
         let d = Date::parse("2026-06-17").unwrap();
         assert_eq!((d.year, d.month, d.day), (2026, 6, 17));
         // 2026-06-17 is a Wednesday.
-        assert_eq!(d.weekday_short(), "Wed");
-        assert_eq!(d.month_short(), "Jun");
+        assert_eq!(d.weekday_short(Language::En), "Wed");
+        assert_eq!(d.weekday_short(Language::Hr), "Sri");
+        assert_eq!(d.month_short(Language::En), "Jun");
+        assert_eq!(d.month_short(Language::Hr), "Lip");
     }
 
     #[test]
     fn parses_date_from_timestamp() {
         let d = Date::parse("2026-12-25T13:00").unwrap();
-        assert_eq!(d.weekday_short(), "Fri");
+        assert_eq!(d.weekday_short(Language::En), "Fri");
     }
 
     #[test]

@@ -12,7 +12,7 @@ use embedded_graphics::primitives::{Line, PrimitiveStyle};
 use u8g2_fonts::types::{FontColor, HorizontalAlignment, VerticalPosition};
 use u8g2_fonts::{FontRenderer, fonts};
 
-use crate::config::Config;
+use crate::config::{Config, Language};
 use crate::weather::{Day, Forecast};
 
 const BLACK: BinaryColor = BinaryColor::On;
@@ -20,7 +20,7 @@ const HEADER_HEIGHT: i32 = 118;
 
 /// Render the full forecast onto `target`. The target's own size drives the
 /// layout, so rotation handled by the display buffer is transparent here.
-pub fn draw<D>(target: &mut D, forecast: &Forecast, _config: &Config) -> Result<()>
+pub fn draw<D>(target: &mut D, forecast: &Forecast, config: &Config) -> Result<()>
 where
     D: DrawTarget<Color = BinaryColor> + OriginDimensions,
     D::Error: core::fmt::Debug,
@@ -32,15 +32,16 @@ where
 
     let size = target.size();
     let width = size.width as i32;
+    let lang = config.language;
 
-    draw_header(target, forecast, width)?;
+    draw_header(target, forecast, width, lang)?;
     hline(target, 0, width, HEADER_HEIGHT)?;
-    draw_day_cards(target, &forecast.days, size)?;
+    draw_day_cards(target, &forecast.days, size, lang)?;
 
     Ok(())
 }
 
-fn draw_header<D>(target: &mut D, forecast: &Forecast, width: i32) -> Result<()>
+fn draw_header<D>(target: &mut D, forecast: &Forecast, width: i32, lang: Language) -> Result<()>
 where
     D: DrawTarget<Color = BinaryColor>,
     D::Error: core::fmt::Debug,
@@ -64,9 +65,9 @@ where
         let d = today.date;
         let date = format!(
             "{}, {} {} {}",
-            d.weekday_short(),
+            d.weekday_short(lang),
             d.day,
-            d.month_short(),
+            d.month_short(lang),
             d.year
         );
         text(
@@ -78,7 +79,11 @@ where
             HorizontalAlignment::Left,
         )?;
     }
-    let now = format!("Now: {}", forecast.current.condition.label());
+    let now = format!(
+        "{} {}",
+        lang.now_prefix(),
+        forecast.current.condition.label(lang)
+    );
     text(
         target,
         &body,
@@ -108,7 +113,7 @@ where
         84,
     )?;
 
-    let refreshed = format!("Refreshed {}", forecast.refreshed_at);
+    let refreshed = format!("{} {}", lang.refreshed_prefix(), forecast.refreshed_at);
     text(
         target,
         &small,
@@ -121,7 +126,7 @@ where
     Ok(())
 }
 
-fn draw_day_cards<D>(target: &mut D, days: &[Day], size: Size) -> Result<()>
+fn draw_day_cards<D>(target: &mut D, days: &[Day], size: Size, lang: Language) -> Result<()>
 where
     D: DrawTarget<Color = BinaryColor>,
     D::Error: core::fmt::Debug,
@@ -151,7 +156,7 @@ where
             vline(target, x0, top + 10, height - 10)?;
         }
 
-        let label = format!("{} {}", day.date.weekday_short(), day.date.day);
+        let label = format!("{} {}", day.date.weekday_short(lang), day.date.day);
         text(
             target,
             &weekday,
