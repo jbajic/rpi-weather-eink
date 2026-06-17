@@ -1,0 +1,11 @@
+# Configuration for `cross` (https://github.com/cross-rs/cross).
+# The Raspberry Pi Zero W is ARMv6 hardfloat -> arm-unknown-linux-gnueabihf.
+# cross provides a Docker image with the matching C toolchain, which is needed
+# to cross-compile the TLS backend (ring) for ARM.
+
+[build]
+# Pass the network proxy / cargo env through to the container if set.
+passthrough = ["CARGO_NET_GIT_FETCH_WITH_CLI"]
+
+[target.arm-unknown-linux-gnueabihf]
+# The default cross image already includes gcc-arm-linux-gnueabihf; nothing to add.

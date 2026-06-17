@@ -1,0 +1,12 @@
+[Unit]
+Description=Render the weekly weather forecast to the e-ink panel
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=pi
+WorkingDirectory=/home/pi/eink
+ExecStart=/home/pi/eink/render-once --config /home/pi/eink/config.toml
+# Give the network/geocoding call room on a slow Pi Zero W.
+TimeoutStartSec=120

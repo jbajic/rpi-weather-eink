@@ -1,0 +1,12 @@
+[Unit]
+Description=Refresh the weather e-ink display periodically
+
+[Timer]
+# First render shortly after boot, then hourly.
+OnBootSec=2min
+OnUnitActiveSec=1h
+# Catch up with a render if the Pi was asleep/off at the scheduled time.
+Persistent=true
+
+[Install]
+WantedBy=timers.target

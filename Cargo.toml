@@ -1,0 +1,31 @@
+[package]
+name = "eink"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0.102"
+embedded-graphics = "0.8.2"
+epd-waveshare = { version = "0.6.0", optional = true }
+image = { version = "0.25.10", default-features = false, features = ["png"] }
+rppal = { version = "0.22.1", optional = true, features = ["hal"] }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.150"
+toml = "1.1.2"
+u8g2-fonts = { version = "0.8.0", features = ["embedded_graphics_textstyle"] }
+ureq = { version = "3.3.0", features = ["json"] }
+
+[features]
+default = ["preview"]
+# Host build: render to PNG, no Pi hardware required (builds/tests on x86).
+preview = []
+# Device build: drive the real e-paper panel over SPI/GPIO (Raspberry Pi only).
+device = ["dep:rppal", "dep:epd-waveshare"]
+
+[lib]
+name = "eink"
+path = "src/lib.rs"
+
+[[bin]]
+name = "render-once"
+path = "src/bin/render-once.rs"
