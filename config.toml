@@ -1,7 +1,7 @@
 # Weather e-ink display configuration.
 
 [location]
-city = "Zagreb"
+city = "Osijek"
 country = "HR"      # optional ISO country code to disambiguate the city
 
 [units]
@@ -12,6 +12,7 @@ precipitation = "mm"      # mm | inch
 [display]
 model = "epd7in5_v2"
 rotation = 0
+invert = true            # set true if the panel shows white-on-black (inverted)
 
 # Standard Waveshare e-Paper HAT wiring (BCM GPIO numbers).
 [display.pins]
@@ -20,4 +21,5 @@ dc = 25
 busy = 24
 
 [refresh]
-interval_minutes = 60
+# How often to re-render. Applied to the systemd timer by deploy.sh.
+interval_minutes = 20

@@ -33,8 +33,17 @@ else
     scp config.toml "${PI_HOST}:${PI_DIR}/config.toml"
 fi
 
+# Apply the refresh interval from config.toml to the timer.
+INTERVAL="$(awk -F= '/^[[:space:]]*interval_minutes/ {gsub(/[^0-9]/, "", $2); print $2; exit}' config.toml)"
+INTERVAL="${INTERVAL:-60}"
+echo ">> Refresh interval: ${INTERVAL} min"
+TMP_TIMER="$(mktemp)"
+sed "s/^OnUnitActiveSec=.*/OnUnitActiveSec=${INTERVAL}min/" deploy/eink.timer > "${TMP_TIMER}"
+
 echo ">> Installing systemd units ..."
-scp deploy/eink.service deploy/eink.timer "${PI_HOST}:/tmp/"
+scp deploy/eink.service "${PI_HOST}:/tmp/eink.service"
+scp "${TMP_TIMER}" "${PI_HOST}:/tmp/eink.timer"
+rm -f "${TMP_TIMER}"
 ssh "${PI_HOST}" "sudo mv /tmp/eink.service /tmp/eink.timer /etc/systemd/system/ \
     && sudo systemctl daemon-reload \
     && sudo systemctl enable --now eink.timer"

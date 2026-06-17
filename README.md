@@ -55,6 +55,7 @@ precipitation = "mm"      # mm | inch
 [display]
 model = "epd7in5_v2"
 rotation = 0              # 0 | 90 | 180 | 270
+invert = true            # flip black/white if the panel renders inverted
 
 [display.pins]            # standard Waveshare HAT wiring (BCM numbers)
 reset = 17
@@ -62,7 +63,7 @@ dc = 25
 busy = 24
 
 [refresh]
-interval_minutes = 60
+interval_minutes = 60     # applied to the systemd timer by deploy.sh
 ```
 
 ## Wiring (Waveshare 7.5" V2 HAT)

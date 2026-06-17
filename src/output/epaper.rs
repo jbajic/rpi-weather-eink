@@ -52,7 +52,7 @@ pub fn show(config: &Config, canvas: &Canvas) -> Result<()> {
 
     let mut display = Display7in5::default();
     display.set_rotation(rotation(config.display.rotation));
-    blit(canvas, &mut display);
+    blit(canvas, &mut display, config.display.invert);
 
     epd.update_and_display_frame(&mut spi, display.buffer(), &mut delay)
         .map_err(|e| anyhow!("sending frame to panel: {e:?}"))?;
@@ -70,14 +70,13 @@ fn rotation(degrees: u16) -> DisplayRotation {
     }
 }
 
-fn blit(canvas: &Canvas, display: &mut Display7in5) {
+fn blit(canvas: &Canvas, display: &mut Display7in5, invert: bool) {
     for y in 0..canvas.height() {
         for x in 0..canvas.width() {
-            let color = if canvas.is_on(x, y) {
-                Color::Black
-            } else {
-                Color::White
-            };
+            // Foreground pixels are black; `invert` flips the polarity for panels
+            // that render colors reversed.
+            let as_black = canvas.is_on(x, y) != invert;
+            let color = if as_black { Color::Black } else { Color::White };
             // Drawing into the in-memory buffer is infallible.
             let _ = Pixel(Point::new(x as i32, y as i32), color).draw(display);
         }

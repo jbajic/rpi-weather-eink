@@ -135,6 +135,8 @@ pub struct Display {
     pub model: String,
     /// Rotation in degrees (0, 90, 180, 270).
     pub rotation: u16,
+    /// Swap black/white if the panel renders colors inverted (background black).
+    pub invert: bool,
     pub pins: Pins,
 }
 
@@ -143,6 +145,7 @@ impl Default for Display {
         Self {
             model: "epd7in5_v2".to_string(),
             rotation: 0,
+            invert: false,
             pins: Pins::default(),
         }
     }
