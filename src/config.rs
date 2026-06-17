@@ -159,6 +159,9 @@ pub struct Pins {
     pub reset: u8,
     pub dc: u8,
     pub busy: u8,
+    /// Power-enable pin. Newer HATs gate panel power on this line; it must be
+    /// driven high before the controller will respond. Set to 255 to disable.
+    pub power: u8,
 }
 
 impl Default for Pins {
@@ -167,6 +170,7 @@ impl Default for Pins {
             reset: 17,
             dc: 25,
             busy: 24,
+            power: 18,
         }
     }
 }

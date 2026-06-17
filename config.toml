@@ -19,6 +19,7 @@ invert = true            # set true if the panel shows white-on-black (inverted)
 reset = 17
 dc = 25
 busy = 24
+power = 18               # PWR enable on newer HATs; set 255 to disable
 
 [refresh]
 # How often to re-render. Applied to the systemd timer by deploy.sh.

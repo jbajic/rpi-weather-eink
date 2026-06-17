@@ -8,6 +8,9 @@
 //!
 //! [`show`] is the one-shot convenience: open, push once, drop.
 
+use std::thread::sleep;
+use std::time::Duration;
+
 use anyhow::{Context, Result, anyhow};
 use embedded_graphics::Pixel;
 use embedded_graphics::prelude::*;
@@ -35,6 +38,9 @@ pub fn canvas_size(config: &Config) -> (u32, u32) {
     }
 }
 
+/// Disables the power-enable pin (panel power not gated by GPIO).
+const POWER_PIN_DISABLED: u8 = 255;
+
 /// An initialised panel, ready to receive frames.
 pub struct Panel {
     spi: SimpleHalSpiDevice,
@@ -42,6 +48,8 @@ pub struct Panel {
     epd: PanelEpd,
     rotation: DisplayRotation,
     invert: bool,
+    /// Held high for the panel's lifetime; powers the module off when dropped.
+    _power: Option<OutputPin>,
 }
 
 impl Panel {
@@ -56,6 +64,21 @@ impl Panel {
 
         log("opening GPIO pins ...");
         let gpio = Gpio::new().context("opening GPIO")?;
+
+        // Power the panel on first: newer HATs gate module power on this pin,
+        // and the controller won't respond on BUSY until it is driven high.
+        let power = if config.display.pins.power == POWER_PIN_DISABLED {
+            None
+        } else {
+            log("driving PWR high to power on panel ...");
+            let pin = gpio
+                .get(config.display.pins.power)
+                .context("PWR pin")?
+                .into_output_high();
+            sleep(Duration::from_millis(100));
+            Some(pin)
+        };
+
         let dc = gpio
             .get(config.display.pins.dc)
             .context("DC pin")?
@@ -81,6 +104,7 @@ impl Panel {
             epd,
             rotation: rotation(config.display.rotation),
             invert: config.display.invert,
+            _power: power,
         })
     }
 
