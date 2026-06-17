@@ -3,7 +3,7 @@
 # cross provides a Docker image with the matching C toolchain, which is needed
 # to cross-compile the TLS backend (ring) for ARM.
 
-[build]
+[build.env]
 # Pass the network proxy / cargo env through to the container if set.
 passthrough = ["CARGO_NET_GIT_FETCH_WITH_CLI"]
 
