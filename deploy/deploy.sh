@@ -22,6 +22,11 @@ echo ">> Built ${BIN_DIR}/{eink-daemon,render-once}"
 echo ">> Ensuring ${PI_DIR} exists on ${PI_HOST} ..."
 ssh "${PI_HOST}" "mkdir -p '${PI_DIR}'"
 
+# Stop the daemon first: a running executable is locked (ETXTBSY) and can't be
+# overwritten. It is restarted by 'enable --now' at the end.
+echo ">> Stopping daemon (if running) ..."
+ssh "${PI_HOST}" "sudo systemctl stop eink-daemon 2>/dev/null; true"
+
 echo ">> Copying binaries ..."
 scp "${BIN_DIR}/eink-daemon" "${PI_HOST}:${PI_DIR}/eink-daemon"
 scp "${BIN_DIR}/render-once" "${PI_HOST}:${PI_DIR}/render-once"

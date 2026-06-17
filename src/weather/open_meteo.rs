@@ -6,7 +6,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use anyhow::{Context, Result, anyhow};
 use serde::Deserialize;
 
-use crate::config::Config;
+use crate::config::{Config, Language};
 
 use super::model::{Condition, Current, Date, Day, Forecast, format_local_timestamp};
 
@@ -25,7 +25,12 @@ pub fn fetch_forecast(config: &Config) -> Result<Forecast> {
     };
 
     let days = build_days(&raw.daily)?;
-    let location_name = match &place.country {
+    let country = localized_country(
+        place.country_code.as_deref(),
+        place.country,
+        config.language,
+    );
+    let location_name = match country {
         Some(country) => format!("{}, {}", place.name, country),
         None => place.name,
     };
@@ -37,6 +42,19 @@ pub fn fetch_forecast(config: &Config) -> Result<Forecast> {
         temperature_symbol: config.units.temperature.symbol(),
         refreshed_at: format_local_timestamp(now_local_secs(raw.utc_offset_seconds)),
     })
+}
+
+/// Preferred display name for a country. The geocoder's localized name can be
+/// formal (e.g. "Republika Hrvatska"); override the cases we care about.
+fn localized_country(
+    code: Option<&str>,
+    api_name: Option<String>,
+    lang: Language,
+) -> Option<String> {
+    if lang == Language::Hr && code.is_some_and(|c| c.eq_ignore_ascii_case("HR")) {
+        return Some("Hrvatska".to_string());
+    }
+    api_name
 }
 
 /// Current wall-clock time, shifted into the location's local timezone using
