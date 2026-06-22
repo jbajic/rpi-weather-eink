@@ -4,7 +4,9 @@ Renders a 7-day weather forecast to a **Waveshare 7.5" V2 (800×480) black/white
 e-paper panel on a **Raspberry Pi Zero W** — by drawing images directly, with no
 Chromium / headless browser involved.
 
-Weather comes from [Open-Meteo](https://open-meteo.com/) (no API key).
+Weather comes from a selectable provider — [met.no](https://api.met.no/) (the
+Norwegian Meteorological Institute, behind Yr.no; the default) or
+[Open-Meteo](https://open-meteo.com/). Both are free and need no API key.
 
 ![preview](forecast.png)
 
@@ -13,7 +15,9 @@ Weather comes from [Open-Meteo](https://open-meteo.com/) (no API key).
 The pipeline is `config → fetch → render → output`:
 
 - **`config`** — TOML file (location, units, display, refresh).
-- **`weather`** — Open-Meteo geocoding + 7-day forecast over HTTPS (`ureq`).
+- **`weather`** — Open-Meteo geocoding (shared) + a 7-day forecast over HTTPS
+  (`ureq`) from the configured provider. met.no returns a UTC timeseries that is
+  folded into local days using the geocoded IANA timezone (`chrono-tz`).
 - **`render`** — draws an 800×480 1-bit framebuffer with `embedded-graphics`;
   text via `u8g2-fonts`, weather icons drawn as vector primitives.
 - **`output`** — the rendered framebuffer goes to **either** a PNG (host preview)
@@ -40,9 +44,11 @@ cargo test
 
 ## Configuration
 
-See [`config.toml`](config.toml). Units map directly to Open-Meteo:
+See [`config.toml`](config.toml):
 
 ```toml
+provider = "met-no"       # met-no (Yr.no, default) | open-meteo
+
 [location]
 city = "Zagreb"
 country = "HR"            # optional, disambiguates the geocoding hit
@@ -61,9 +67,10 @@ invert = true            # flip black/white if the panel renders inverted
 reset = 17
 dc = 25
 busy = 24
+power = 18               # PWR enable on newer HATs; 255 to disable
 
 [refresh]
-interval_minutes = 60     # applied to the systemd timer by deploy.sh
+interval_minutes = 60     # how often the daemon re-fetches and re-renders
 ```
 
 ## Wiring (Waveshare 7.5" V2 HAT)
@@ -94,13 +101,19 @@ cargo install cross
 PI_HOST=pi@raspberrypi.local ./deploy/deploy.sh
 ```
 
-`deploy.sh` cross-builds the `device` binary, copies it plus `config.toml`
-(without clobbering an existing one), installs the systemd units, and enables
-the hourly timer. Trigger an immediate render with:
+`deploy.sh` cross-builds the `device` binary, copies it plus `config.toml`,
+and installs/enables the `eink-daemon` systemd service. An existing
+`config.toml` on the device is left untouched by default; pass
+`--overwrite-config` to replace it with the repo copy:
 
 ```sh
-ssh pi@raspberrypi.local sudo systemctl start eink.service
-ssh pi@raspberrypi.local journalctl -u eink.service -n 30
+PI_HOST=pi@raspberrypi.local ./deploy/deploy.sh --overwrite-config
+```
+
+Watch the daemon (it logs every fetch/render/push):
+
+```sh
+ssh pi@raspberrypi.local journalctl -u eink-daemon -f
 ```
 
 Building directly on the Pi Zero W also works but is very slow (single-core
