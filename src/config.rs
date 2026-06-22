@@ -11,6 +11,9 @@ use serde::Deserialize;
 #[derive(Debug, Clone, Deserialize)]
 pub struct Config {
     pub location: Location,
+    /// Weather data source.
+    #[serde(default)]
+    pub provider: WeatherProvider,
     /// UI language for labels, weekdays and months.
     #[serde(default)]
     pub language: Language,
@@ -20,6 +23,18 @@ pub struct Config {
     pub display: Display,
     #[serde(default)]
     pub refresh: Refresh,
+}
+
+/// Weather data source. Open-Meteo needs no key; met.no (Norwegian
+/// Meteorological Institute, the data behind Yr.no) also needs no key but
+/// sends a descriptive User-Agent and derives the local timezone from the
+/// geocoded coordinates.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum WeatherProvider {
+    #[default]
+    OpenMeteo,
+    MetNo,
 }
 
 /// Display language. Croatian uses ASCII counterparts for diacritics

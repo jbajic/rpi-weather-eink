@@ -1,28 +1,23 @@
-//! Open-Meteo client: geocode a city name, then fetch a 7-day forecast.
-//! No API key required.
+//! Open-Meteo forecast client. Geocoding is shared (see `geocode`); this module
+//! fetches the 7-day forecast for resolved coordinates. No API key required.
 
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result, anyhow};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
-use crate::config::{Config, Language};
+use crate::config::Config;
 
+use super::geocode;
 use super::model::{Condition, Current, Date, Day, Forecast, format_local_timestamp};
 
-const GEOCODE_URL: &str = "https://geocoding-api.open-meteo.com/v1/search";
 const FORECAST_URL: &str = "https://api.open-meteo.com/v1/forecast";
 const FORECAST_DAYS: u32 = 7;
-/// On-disk cache of the resolved coordinates (in the working directory).
-const GEOCODE_CACHE_FILE: &str = "geocode_cache.json";
-/// Cap each HTTP request so a flaky network can't hang the daemon; on timeout
-/// the call errors and the daemon simply retries on the next refresh tick.
-const HTTP_TIMEOUT: Duration = Duration::from_secs(20);
 
 /// Resolve the configured city and fetch its weekly forecast.
 pub fn fetch_forecast(config: &Config) -> Result<Forecast> {
-    let agent = http_agent();
-    let place = resolve_place(&agent, config)?;
+    let agent = super::http_agent();
+    let place = geocode::resolve_place(&agent, config)?;
     let raw = fetch_raw(&agent, config, place.latitude, place.longitude)?;
 
     let current = Current {
@@ -31,36 +26,14 @@ pub fn fetch_forecast(config: &Config) -> Result<Forecast> {
     };
 
     let days = build_days(&raw.daily)?;
-    let country = localized_country(
-        place.country_code.as_deref(),
-        place.country,
-        config.language,
-    );
-    let location_name = match country {
-        Some(country) => format!("{}, {}", place.name, country),
-        None => place.name,
-    };
 
     Ok(Forecast {
-        location_name,
+        location_name: geocode::display_name(&place, config.language),
         current,
         days,
         temperature_symbol: config.units.temperature.symbol(),
         refreshed_at: format_local_timestamp(now_local_secs(raw.utc_offset_seconds)),
     })
-}
-
-/// Preferred display name for a country. The geocoder's localized name can be
-/// formal (e.g. "Republika Hrvatska"); override the cases we care about.
-fn localized_country(
-    code: Option<&str>,
-    api_name: Option<String>,
-    lang: Language,
-) -> Option<String> {
-    if lang == Language::Hr && code.is_some_and(|c| c.eq_ignore_ascii_case("HR")) {
-        return Some("Hrvatska".to_string());
-    }
-    api_name
 }
 
 /// Current wall-clock time, shifted into the location's local timezone using
@@ -71,99 +44,6 @@ fn now_local_secs(utc_offset_seconds: i64) -> i64 {
         .map(|d| d.as_secs() as i64)
         .unwrap_or(0);
     now_utc + utc_offset_seconds
-}
-
-fn http_agent() -> ureq::Agent {
-    ureq::Agent::new_with_config(
-        ureq::Agent::config_builder()
-            .timeout_global(Some(HTTP_TIMEOUT))
-            .build(),
-    )
-}
-
-/// Resolve coordinates for the configured city, reusing the on-disk cache when
-/// it matches the current city/country/language; otherwise geocode and cache.
-fn resolve_place(agent: &ureq::Agent, config: &Config) -> Result<GeoResult> {
-    let key = GeoKey {
-        city: config.location.city.clone(),
-        country: config.location.country.clone(),
-        language: config.language.code().to_string(),
-    };
-
-    if let Some(cached) = read_geocode_cache() {
-        if cached.key == key {
-            eprintln!("[weather] using cached coordinates for {:?}", key.city);
-            return Ok(cached.place);
-        }
-    }
-
-    let place = geocode(agent, config)?;
-    write_geocode_cache(&GeoCache {
-        key,
-        place: place.clone(),
-    });
-    Ok(place)
-}
-
-fn read_geocode_cache() -> Option<GeoCache> {
-    let text = std::fs::read_to_string(GEOCODE_CACHE_FILE).ok()?;
-    serde_json::from_str(&text).ok()
-}
-
-fn write_geocode_cache(cache: &GeoCache) {
-    match serde_json::to_string_pretty(cache) {
-        Ok(json) => {
-            if let Err(e) = std::fs::write(GEOCODE_CACHE_FILE, json) {
-                eprintln!("[weather] could not write geocode cache: {e}");
-            }
-        }
-        Err(e) => eprintln!("[weather] could not serialize geocode cache: {e}"),
-    }
-}
-
-fn geocode(agent: &ureq::Agent, config: &Config) -> Result<GeoResult> {
-    eprintln!("[weather] geocoding city {:?} ...", config.location.city);
-    let mut response = agent
-        .get(GEOCODE_URL)
-        .query("name", &config.location.city)
-        .query("count", "10")
-        .query("language", config.language.code())
-        .query("format", "json")
-        .call()
-        .context("geocoding request failed")?;
-
-    let body: GeoResponse = response
-        .body_mut()
-        .read_json()
-        .context("decoding geocoding response")?;
-    eprintln!("[weather] geocoding response received");
-
-    let results = body
-        .results
-        .filter(|r| !r.is_empty())
-        .ok_or_else(|| anyhow!("no geocoding match for city {:?}", config.location.city))?;
-
-    // Prefer a result matching the configured country code, else take the first.
-    let chosen = match &config.location.country {
-        Some(country) => results
-            .iter()
-            .find(|r| {
-                r.country_code
-                    .as_deref()
-                    .is_some_and(|c| c.eq_ignore_ascii_case(country))
-            })
-            .or_else(|| results.first()),
-        None => results.first(),
-    };
-
-    let chosen = chosen
-        .cloned()
-        .ok_or_else(|| anyhow!("no usable geocoding result"))?;
-    eprintln!(
-        "[weather] resolved to {} @ {:.4},{:.4}",
-        chosen.name, chosen.latitude, chosen.longitude
-    );
-    Ok(chosen)
 }
 
 fn fetch_raw(
@@ -242,35 +122,7 @@ fn build_days(daily: &DailyBlock) -> Result<Vec<Day>> {
     Ok(days)
 }
 
-// --- Open-Meteo JSON wire types -------------------------------------------
-
-#[derive(Debug, Deserialize)]
-struct GeoResponse {
-    results: Option<Vec<GeoResult>>,
-}
-
-#[derive(Debug, Clone, Deserialize, Serialize)]
-struct GeoResult {
-    name: String,
-    latitude: f64,
-    longitude: f64,
-    country: Option<String>,
-    country_code: Option<String>,
-}
-
-/// Cache key: re-geocode only if the city, country filter, or language changes.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
-struct GeoKey {
-    city: String,
-    country: Option<String>,
-    language: String,
-}
-
-#[derive(Debug, Clone, Deserialize, Serialize)]
-struct GeoCache {
-    key: GeoKey,
-    place: GeoResult,
-}
+// --- Open-Meteo forecast JSON wire types ----------------------------------
 
 #[derive(Debug, Deserialize)]
 struct ForecastResponse {

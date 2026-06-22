@@ -1,5 +1,9 @@
 # Weather e-ink display configuration.
 
+# Weather data source: "open-meteo" (default) or "met-no" (Norwegian
+# Meteorological Institute / Yr.no). Both are free and need no API key.
+provider = "met-no"
+
 # UI language: "en" or "hr" (Croatian uses ASCII for diacritics: c/z/s/d).
 language = "hr"
 

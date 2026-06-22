@@ -40,6 +40,47 @@ impl Condition {
         }
     }
 
+    /// Map a met.no `symbol_code` (e.g. "partlycloudy_day", "heavyrain") to a
+    /// condition. The trailing `_day` / `_night` / `_polartwilight` variant is
+    /// irrelevant for a B/W display, so it is ignored; classification is by the
+    /// dominant precipitation type, matching the WMO mapping's priorities.
+    pub fn from_met_symbol(code: &str) -> Self {
+        let base = code
+            .trim_end_matches("_day")
+            .trim_end_matches("_night")
+            .trim_end_matches("_polartwilight");
+        let has = |needle: &str| base.contains(needle);
+
+        if has("thunder") {
+            Condition::Thunderstorm
+        } else if has("sleet") {
+            Condition::FreezingRain
+        } else if has("snow") {
+            if has("showers") {
+                Condition::SnowShowers
+            } else {
+                Condition::Snow
+            }
+        } else if has("rain") {
+            if has("showers") {
+                Condition::Showers
+            } else if has("light") {
+                Condition::Drizzle
+            } else {
+                Condition::Rain
+            }
+        } else {
+            match base {
+                "clearsky" => Condition::Clear,
+                "fair" => Condition::MainlyClear,
+                "partlycloudy" => Condition::PartlyCloudy,
+                "cloudy" => Condition::Overcast,
+                "fog" => Condition::Fog,
+                _ => Condition::Unknown,
+            }
+        }
+    }
+
     /// Short human-readable label for the header.
     pub fn label(self, lang: Language) -> &'static str {
         match lang {
@@ -208,6 +249,37 @@ mod tests {
     fn parses_date_from_timestamp() {
         let d = Date::parse("2026-12-25T13:00").unwrap();
         assert_eq!(d.weekday_short(Language::En), "Fri");
+    }
+
+    #[test]
+    fn maps_met_symbol_codes() {
+        assert_eq!(Condition::from_met_symbol("clearsky_day"), Condition::Clear);
+        assert_eq!(
+            Condition::from_met_symbol("fair_night"),
+            Condition::MainlyClear
+        );
+        assert_eq!(
+            Condition::from_met_symbol("partlycloudy_day"),
+            Condition::PartlyCloudy
+        );
+        assert_eq!(Condition::from_met_symbol("cloudy"), Condition::Overcast);
+        assert_eq!(Condition::from_met_symbol("lightrain"), Condition::Drizzle);
+        assert_eq!(Condition::from_met_symbol("heavyrain"), Condition::Rain);
+        assert_eq!(
+            Condition::from_met_symbol("rainshowers_day"),
+            Condition::Showers
+        );
+        assert_eq!(Condition::from_met_symbol("snow"), Condition::Snow);
+        assert_eq!(
+            Condition::from_met_symbol("lightsnowshowers_day"),
+            Condition::SnowShowers
+        );
+        assert_eq!(Condition::from_met_symbol("sleet"), Condition::FreezingRain);
+        assert_eq!(
+            Condition::from_met_symbol("heavyrainshowersandthunder_day"),
+            Condition::Thunderstorm
+        );
+        assert_eq!(Condition::from_met_symbol("nonsense"), Condition::Unknown);
     }
 
     #[test]
