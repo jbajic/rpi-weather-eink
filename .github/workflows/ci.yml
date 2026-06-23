@@ -31,3 +31,27 @@ jobs:
 
       - name: Test
         run: cargo test --verbose
+
+  cross-build:
+    name: Cross-build device target (Pi Zero W)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cross
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cross
+
+      - name: Cache cargo build
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: arm-unknown-linux-gnueabihf
+
+      # Mirrors deploy/deploy.sh: build the `device` binaries for the Pi Zero W
+      # (ARMv6 hardfloat) so a broken cross build is caught here, not on deploy.
+      - name: Build
+        run: cross build --release --target arm-unknown-linux-gnueabihf --no-default-features --features device --verbose
