@@ -8,7 +8,7 @@ Weather comes from a selectable provider — [met.no](https://api.met.no/) (the
 Norwegian Meteorological Institute, behind Yr.no; the default) or
 [Open-Meteo](https://open-meteo.com/). Both are free and need no API key.
 
-![preview](forecast.png)
+![preview](docs/preview.png)
 
 ## How it works
 
