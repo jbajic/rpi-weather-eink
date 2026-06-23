@@ -47,9 +47,11 @@ where
     D::Error: core::fmt::Debug,
 {
     let title = FontRenderer::new::<fonts::u8g2_font_helvB18_tf>();
-    let body = FontRenderer::new::<fonts::u8g2_font_helvR14_tf>();
+    // Bold weights throughout: regular-weight glyphs have 1px stems that the
+    // e-paper waveform can't drive to full black, so thin text reads gray.
+    let body = FontRenderer::new::<fonts::u8g2_font_helvB14_tf>();
     let big = FontRenderer::new::<fonts::u8g2_font_logisoso32_tf>();
-    let small = FontRenderer::new::<fonts::u8g2_font_helvR10_tf>();
+    let small = FontRenderer::new::<fonts::u8g2_font_helvB10_tf>();
 
     // Left column: place, date, current condition.
     text(
@@ -140,8 +142,8 @@ where
     let col_w = width / n;
 
     let weekday = FontRenderer::new::<fonts::u8g2_font_helvB14_tf>();
-    let temps = FontRenderer::new::<fonts::u8g2_font_helvR14_tf>();
-    let small = FontRenderer::new::<fonts::u8g2_font_helvR10_tf>();
+    let temps = FontRenderer::new::<fonts::u8g2_font_helvB14_tf>();
+    let small = FontRenderer::new::<fonts::u8g2_font_helvB10_tf>();
 
     let top = HEADER_HEIGHT + 1;
     let card_h = height - top;
@@ -236,7 +238,7 @@ where
     D::Error: core::fmt::Debug,
 {
     Line::new(Point::new(x, y0), Point::new(x, y1))
-        .into_styled(PrimitiveStyle::with_stroke(BLACK, 1))
+        .into_styled(PrimitiveStyle::with_stroke(BLACK, 2))
         .draw(target)
         .map_err(|e| anyhow!("line draw error: {e:?}"))?;
     Ok(())
