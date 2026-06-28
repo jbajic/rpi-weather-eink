@@ -23,6 +23,8 @@ pub struct Config {
     pub display: Display,
     #[serde(default)]
     pub refresh: Refresh,
+    #[serde(default)]
+    pub health: Health,
 }
 
 /// Weather data source. Open-Meteo needs no key; met.no (Norwegian
@@ -239,6 +241,25 @@ impl Default for Refresh {
     fn default() -> Self {
         Self {
             interval_minutes: 60,
+        }
+    }
+}
+
+/// HTTP liveness endpoint. Enabled by default; set `enabled = false` to disable.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(default)]
+pub struct Health {
+    /// Expose a `/health` HTTP endpoint.
+    pub enabled: bool,
+    /// Address to bind, e.g. "0.0.0.0:8080".
+    pub listen: String,
+}
+
+impl Default for Health {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            listen: "0.0.0.0:8080".to_string(),
         }
     }
 }

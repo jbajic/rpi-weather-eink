@@ -7,10 +7,12 @@
 //! Only built with `--features device` (see `required-features` in Cargo.toml).
 
 use std::process::ExitCode;
+use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{Context, Result};
 use eink::canvas::Canvas;
+use eink::health::Health;
 use eink::output::epaper::{self, Panel};
 use eink::{Config, render, weather};
 
@@ -46,17 +48,26 @@ fn run() -> Result<()> {
     let interval = Duration::from_secs(u64::from(minutes) * 60);
     eprintln!("[eink] refresh interval: {minutes} min");
 
+    let health = Arc::new(Health::default());
+    if config.health.enabled {
+        // Stale after 2.5 refresh intervals: tolerates one missed tick.
+        let stale = (u64::from(minutes) * 60 * 5) / 2;
+        match eink::health::serve(&config.health.listen, health.clone(), stale) {
+            Ok(()) => eprintln!("[eink] health endpoint on {}", config.health.listen),
+            Err(e) => eprintln!("[eink] health endpoint failed to bind: {e:#}"),
+        }
+    }
+
     eprintln!("[eink] initialising panel (one time) ...");
     let mut panel = Panel::open(&config).context("opening panel")?;
     eprintln!("[eink] panel ready; entering refresh loop");
 
     loop {
         match render_canvas(&config) {
-            Ok(canvas) => {
-                if let Err(e) = panel.push(&canvas) {
-                    eprintln!("[eink] panel push failed: {e:#}");
-                }
-            }
+            Ok(canvas) => match panel.push(&canvas) {
+                Ok(()) => health.mark_success(),
+                Err(e) => eprintln!("[eink] panel push failed: {e:#}"),
+            },
             Err(e) => eprintln!("[eink] refresh failed (will retry next tick): {e:#}"),
         }
         eprintln!("[eink] sleeping {minutes} min until next refresh");
