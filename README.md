@@ -71,6 +71,10 @@ power = 18               # PWR enable on newer HATs; 255 to disable
 
 [refresh]
 interval_minutes = 60     # how often the daemon re-fetches and re-renders
+
+[health]
+enabled = true            # expose a /health HTTP endpoint (on by default)
+listen = "0.0.0.0:8080"   # address:port to bind
 ```
 
 ## Wiring (Waveshare 7.5" V2 HAT)
@@ -98,8 +102,10 @@ most reliable cross toolchain is [`cross`](https://github.com/cross-rs/cross)
 
 ```sh
 cargo install cross
-PI_HOST=pi@raspberrypi.local ./deploy/deploy.sh
+PI_HOST=pi@raspberrypi-weather.home ./deploy/deploy.sh
 ```
+
+`PI_HOST` defaults to `pi@raspberrypi-weather.home`; set it to override.
 
 `deploy.sh` cross-builds the `device` binary, copies it plus `config.toml`,
 and installs/enables the `eink-daemon` systemd service. An existing
@@ -107,13 +113,16 @@ and installs/enables the `eink-daemon` systemd service. An existing
 `--overwrite-config` to replace it with the repo copy:
 
 ```sh
-PI_HOST=pi@raspberrypi.local ./deploy/deploy.sh --overwrite-config
+PI_HOST=pi@raspberrypi-weather.home ./deploy/deploy.sh --overwrite-config
 ```
+
+If `[health] enabled = true`, `deploy.sh` also opens the configured port in
+`ufw` when a firewall is active (a no-op on stock Raspberry Pi OS, which has none).
 
 Watch the daemon (it logs every fetch/render/push):
 
 ```sh
-ssh pi@raspberrypi.local journalctl -u eink-daemon -f
+ssh pi@raspberrypi-weather.home journalctl -u eink-daemon -f
 ```
 
 Building directly on the Pi Zero W also works but is very slow (single-core
@@ -129,10 +138,28 @@ with `sudo systemctl restart eink-daemon`.
 
 `render-once` is still available for host PNG previews and manual one-shot renders.
 
+## Health endpoint
+
+When `[health] enabled = true` (the default), the daemon serves a minimal
+`GET /health` over plain HTTP on `[health] listen` (default `0.0.0.0:8080`) — no
+HTTP framework, just a small std-only accept loop on a background thread.
+
+It reports liveness based on the *last successful refresh*: a daemon stuck
+retrying a failing fetch goes stale, which is the failure worth catching with an
+external probe. It goes stale after ~2.5 refresh intervals (tolerates one missed
+tick).
+
+```sh
+curl http://raspberrypi-weather.home:8080/health
+# healthy:  200  {"status":"ok","last_success_age_s":15}
+# stale:    503  {"status":"stale","last_success_age_s":4200}
+```
+
 ## Roadmap
 
 - [x] One-shot render → PNG preview (host)
 - [x] Render → e-paper panel (device)
 - [x] Long-running daemon driven by `interval_minutes`
+- [x] `/health` liveness endpoint for external monitoring
 - [ ] Web UI (`axum`) to edit config and preview the screen live — reuses
       `config` / `weather` / `render` / the daemon loop unchanged.
