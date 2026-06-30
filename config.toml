@@ -33,8 +33,7 @@ power = 18               # PWR enable on newer HATs; set 255 to disable
 interval_minutes = 20
 
 [health]
-# Expose a minimal /health HTTP endpoint (reports 200 while refreshes are
-# succeeding, 503 once the last success goes stale). Enabled by default;
-# set enabled = false to turn it off.
-enabled = true
-listen = "0.0.0.0:8080"
+# Optional outbound heartbeat: after each successful refresh the daemon pings
+# this URL (a dead-man's-switch, e.g. Healthchecks.io). The external monitor
+# alerts when the pings stop. Leave unset to disable.
+# ping_url = "https://hc-ping.com/your-uuid-here"

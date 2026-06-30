@@ -245,21 +245,12 @@ impl Default for Refresh {
     }
 }
 
-/// HTTP liveness endpoint. Enabled by default; set `enabled = false` to disable.
-#[derive(Debug, Clone, Deserialize)]
+/// Outbound heartbeat. After each successful refresh the daemon pings
+/// `ping_url` (a dead-man's-switch, e.g. Healthchecks.io); the external monitor
+/// alerts when the pings stop. Leave `ping_url` unset to disable.
+#[derive(Debug, Clone, Default, Deserialize)]
 #[serde(default)]
 pub struct Health {
-    /// Expose a `/health` HTTP endpoint.
-    pub enabled: bool,
-    /// Address to bind, e.g. "0.0.0.0:8080".
-    pub listen: String,
-}
-
-impl Default for Health {
-    fn default() -> Self {
-        Self {
-            enabled: true,
-            listen: "0.0.0.0:8080".to_string(),
-        }
-    }
+    /// URL to ping after each successful refresh. `None` disables the heartbeat.
+    pub ping_url: Option<String>,
 }

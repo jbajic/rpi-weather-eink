@@ -73,8 +73,7 @@ power = 18               # PWR enable on newer HATs; 255 to disable
 interval_minutes = 60     # how often the daemon re-fetches and re-renders
 
 [health]
-enabled = true            # expose a /health HTTP endpoint (on by default)
-listen = "0.0.0.0:8080"   # address:port to bind
+# ping_url = "https://hc-ping.com/your-uuid"  # heartbeat after each refresh (unset = off)
 ```
 
 ## Wiring (Waveshare 7.5" V2 HAT)
@@ -116,9 +115,6 @@ and installs/enables the `eink-daemon` systemd service. An existing
 PI_HOST=pi@raspberrypi-weather.home ./deploy/deploy.sh --overwrite-config
 ```
 
-If `[health] enabled = true`, `deploy.sh` also opens the configured port in
-`ufw` when a firewall is active (a no-op on stock Raspberry Pi OS, which has none).
-
 Watch the daemon (it logs every fetch/render/push):
 
 ```sh
@@ -138,28 +134,27 @@ with `sudo systemctl restart eink-daemon`.
 
 `render-once` is still available for host PNG previews and manual one-shot renders.
 
-## Health endpoint
+## Health heartbeat
 
-When `[health] enabled = true` (the default), the daemon serves a minimal
-`GET /health` over plain HTTP on `[health] listen` (default `0.0.0.0:8080`) — no
-HTTP framework, just a small std-only accept loop on a background thread.
+Set `[health] ping_url` to turn the daemon into a dead-man's-switch: after every
+successful refresh it sends a request to that URL. An external monitor
+(e.g. [Healthchecks.io](https://healthchecks.io/)) raises the alert when the
+pings stop — which catches a daemon stuck retrying a failing fetch, without
+exposing any inbound port on the Pi.
 
-It reports liveness based on the *last successful refresh*: a daemon stuck
-retrying a failing fetch goes stale, which is the failure worth catching with an
-external probe. It goes stale after ~2.5 refresh intervals (tolerates one missed
-tick).
-
-```sh
-curl http://raspberrypi-weather.home:8080/health
-# healthy:  200  {"status":"ok","last_success_age_s":15}
-# stale:    503  {"status":"stale","last_success_age_s":4200}
+```toml
+[health]
+ping_url = "https://hc-ping.com/your-uuid"
 ```
+
+Pings are best-effort: a failed ping is logged and never interrupts the refresh
+loop. Leave `ping_url` unset to disable the heartbeat entirely.
 
 ## Roadmap
 
 - [x] One-shot render → PNG preview (host)
 - [x] Render → e-paper panel (device)
 - [x] Long-running daemon driven by `interval_minutes`
-- [x] `/health` liveness endpoint for external monitoring
+- [x] Outbound health heartbeat (dead-man's-switch) for external monitoring
 - [ ] Web UI (`axum`) to edit config and preview the screen live — reuses
       `config` / `weather` / `render` / the daemon loop unchanged.

@@ -71,28 +71,8 @@ ssh "${PI_HOST}" "sudo mv /tmp/eink-daemon.service /etc/systemd/system/ \
     && sudo systemctl daemon-reload \
     && sudo systemctl enable --now eink-daemon.service"
 
-# Open the firewall for the health endpoint, but only if it is enabled in the
-# device's config AND ufw is actually running. Stock Raspberry Pi OS has no
-# firewall, so this is a no-op there; the port is read from the device config so
-# it always matches what the daemon binds.
-echo ">> Configuring firewall for health endpoint (if enabled & ufw active) ..."
-ssh "${PI_HOST}" "bash -s '${PI_DIR}'" <<'REMOTE'
-set -eu
-cfg="$1/config.toml"
-grep -qE '^[[:space:]]*enabled[[:space:]]*=[[:space:]]*true' "$cfg" 2>/dev/null || exit 0
-port=$(sed -n 's/^[[:space:]]*listen[[:space:]]*=[[:space:]]*"[^:]*:\([0-9]*\)".*/\1/p' "$cfg" | head -n1)
-port="${port:-8080}"
-if command -v ufw >/dev/null && sudo ufw status | grep -q "Status: active"; then
-    sudo ufw allow "${port}/tcp"
-    echo "   opened ufw ${port}/tcp"
-else
-    echo "   no active firewall; port ${port} reachable as-is"
-fi
-REMOTE
-
 echo ">> Done. The daemon is running. Watch it with:"
 echo "   ssh ${PI_HOST} journalctl -u eink-daemon -f"
-echo ">> Health check (if enabled in config.toml):"
-echo "   curl http://${PI_HOST#*@}:8080/health"
+echo ">> The daemon pings [health] ping_url after each refresh (if set in config.toml)."
 echo ">> After editing config.toml on the device, apply changes with:"
 echo "   ssh ${PI_HOST} sudo systemctl restart eink-daemon"

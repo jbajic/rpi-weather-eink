@@ -7,12 +7,10 @@
 //! Only built with `--features device` (see `required-features` in Cargo.toml).
 
 use std::process::ExitCode;
-use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{Context, Result};
 use eink::canvas::Canvas;
-use eink::health::Health;
 use eink::output::epaper::{self, Panel};
 use eink::{Config, render, weather};
 
@@ -48,14 +46,8 @@ fn run() -> Result<()> {
     let interval = Duration::from_secs(u64::from(minutes) * 60);
     eprintln!("[eink] refresh interval: {minutes} min");
 
-    let health = Arc::new(Health::default());
-    if config.health.enabled {
-        // Stale after 2.5 refresh intervals: tolerates one missed tick.
-        let stale = (u64::from(minutes) * 60 * 5) / 2;
-        match eink::health::serve(&config.health.listen, health.clone(), stale) {
-            Ok(()) => eprintln!("[eink] health endpoint on {}", config.health.listen),
-            Err(e) => eprintln!("[eink] health endpoint failed to bind: {e:#}"),
-        }
+    if let Some(url) = &config.health.ping_url {
+        eprintln!("[eink] heartbeat enabled, pinging {url} after each refresh");
     }
 
     eprintln!("[eink] initialising panel (one time) ...");
@@ -65,7 +57,14 @@ fn run() -> Result<()> {
     loop {
         match render_canvas(&config) {
             Ok(canvas) => match panel.push(&canvas) {
-                Ok(()) => health.mark_success(),
+                Ok(()) => {
+                    if let Some(url) = &config.health.ping_url {
+                        match eink::health::ping(url) {
+                            Ok(()) => eprintln!("[eink] heartbeat sent"),
+                            Err(e) => eprintln!("[eink] heartbeat ping failed: {e:#}"),
+                        }
+                    }
+                }
                 Err(e) => eprintln!("[eink] panel push failed: {e:#}"),
             },
             Err(e) => eprintln!("[eink] refresh failed (will retry next tick): {e:#}"),
