@@ -1,3 +1,4 @@
 /target
 /forecast.png
 /geocode_cache.json
+/config.toml

@@ -31,6 +31,12 @@ done
 
 cd "$(dirname "$0")/.."
 
+if [[ ! -f config.toml ]]; then
+    echo "config.toml not found. Copy the template first:" >&2
+    echo "  cp config.example.toml config.toml" >&2
+    exit 1
+fi
+
 echo ">> Building for ${TARGET} ..."
 cross build --release --target "${TARGET}" --no-default-features --features device
 

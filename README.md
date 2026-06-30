@@ -44,7 +44,14 @@ cargo test
 
 ## Configuration
 
-See [`config.toml`](config.toml):
+Copy the template and edit it — the real `config.toml` is gitignored so
+device-specific values (and the health ping URL) stay out of version control:
+
+```sh
+cp config.example.toml config.toml
+```
+
+See [`config.example.toml`](config.example.toml):
 
 ```toml
 provider = "met-no"       # met-no (Yr.no, default) | open-meteo
